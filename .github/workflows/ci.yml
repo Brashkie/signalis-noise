@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel in-flight runs for the same ref (saves CI minutes on rapid pushes).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ─── Fast feedback: lint + typecheck (single OS, no matrix) ──────────────
+  quality:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (Biome)
+        run: npm run lint
+
+      - name: Typecheck (TypeScript)
+        run: npm run typecheck
+
+  # ─── Tests across OS + Node versions ────────────────────────────────────
+  # The file stores touch the filesystem, so Windows/macOS coverage matters:
+  # atomic rename semantics differ (the EPERM retry exists precisely for this).
+  test:
+    name: Test — ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  # ─── Coverage (single OS — thresholds enforced by vitest.config.ts) ──────
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
+
+  # ─── Build verification (CJS + ESM + .d.ts must all emit) ───────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify build output
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in dist/index.js dist/index.mjs dist/index.d.ts; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Missing expected build artifact: $f"
+              exit 1
+            fi
+            echo "OK: $f"
+          done
+
+      - name: Verify the package imports cleanly (CJS + ESM)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const m = require('./dist/index.js'); if (typeof m.HandshakeState !== 'function') { throw new Error('CJS export missing'); } console.log('CJS import OK');"
+          node --input-type=module -e "import('./dist/index.mjs').then(m => { if (typeof m.HandshakeState !== 'function') { throw new Error('ESM export missing'); } console.log('ESM import OK'); });"
+
+  # ─── Dependency audit (informational — does not gate merges) ────────────
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate

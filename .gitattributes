@@ -1,0 +1,29 @@
+# Normalize line endings across platforms.
+#
+# Without this, Windows contributors can commit CRLF bytes into the repo, and
+# CI (which runs on Linux) then sees CRLF where Biome expects LF — every file
+# fails formatting. `eol=lf` forces LF in the repository AND in the working
+# directory on every OS. Modern editors on Windows handle LF fine.
+
+# Default: auto-detect text files, always store & check out with LF.
+* text=auto eol=lf
+
+# Explicit for the file types we care about (belt and braces).
+*.ts    text eol=lf
+*.mts   text eol=lf
+*.cts   text eol=lf
+*.js    text eol=lf
+*.mjs   text eol=lf
+*.cjs   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+
+# Binary files: never touch.
+*.png   binary
+*.jpg   binary
+*.gif   binary
+*.ico   binary
+*.zip   binary
+*.node  binary

@@ -1,0 +1,36 @@
+version: 2
+updates:
+  # npm dependencies
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
+    groups:
+      # Batch dev tooling into a single PR — less noise, easier review.
+      dev-tooling:
+        dependency-type: development
+        patterns:
+          - '@biomejs/*'
+          - 'typescript'
+          - 'tsup'
+          - 'vitest'
+          - '@vitest/*'
+          - '@types/*'
+
+  # GitHub Actions versions
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: 'chore(ci)'
