@@ -64,7 +64,8 @@ describe('official Noise test vectors (byte-for-byte)', () => {
       // Which role knows the other's static up front:
       //   IK / NK  → only the initiator knows the responder's static
       //   KK       → both parties know each other's static
-      const initiatorKnowsRemote = pattern === 'IK' || pattern === 'NK' || pattern === 'KK';
+      const initiatorKnowsRemote =
+        pattern === 'IK' || pattern === 'NK' || pattern === 'KK';
       const responderKnowsRemote = pattern === 'KK';
 
       const initiator = new HandshakeState({
